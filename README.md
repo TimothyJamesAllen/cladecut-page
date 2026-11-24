@@ -1,10 +1,7 @@
 # cladecut in your browser
 
 A web page that reduces a large phylogenetic tree to representative tips, points out the clusters whose
-representative is plainly wrong, and lets you make choices for the next run.
-
-**Your files stay on your computer.** The method runs inside the browser; nothing is uploaded or sent anywhere,
-and the page is not allowed to send anything.
+representative are potentially wrong, and lets you make choices for the next run.
 
 ## What it does
 
