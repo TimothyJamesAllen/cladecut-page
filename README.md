@@ -22,7 +22,7 @@ the least possible.
    any files.
 3. **Set the number of representatives** (a share of the tips, or a number) and press **Run**.
 4. **Look at the flagged clusters.** A cluster is flagged when its representative looks plainly wrong for it: it is
-   the only tip of its family, genus or species while most of the cluster shares another; its sequence differs at
+   the only tip of its name at a taxonomic level (family, genus, species and so on) while most of the cluster shares another; its sequence differs at
    more than 10% of sites from most of the cluster; it sits on one of the longest branches of the tree; or its
    sequence covers less than half the alignment while another tip's is complete. The plainest cases come first.
 5. **Open a cluster** to see its tips, how far each is from the representative, and its part of the tree. Then:

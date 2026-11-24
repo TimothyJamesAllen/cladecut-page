@@ -1,9 +1,9 @@
 // The page: files and settings, the summary, the list of clusters, one cluster, the choices, the downloads.
 // The engine runs in worker.js; this file only shows what it returns and passes on what the expert chooses.
-import { drawTree } from "./treeview.js?v=7ef5d55";
+import { drawTree } from "./treeview.js?v=f0413bd";
 
 const $ = (id) => document.getElementById(id);
-const worker = new Worker("worker.js?v=7ef5d55", { type: "module" });
+const worker = new Worker("worker.js?v=f0413bd", { type: "module" });
 let nextId = 1; const waiting = new Map();
 worker.onmessage = (e) => {
   if (e.data.progress) { status(e.data.progress); return; }
@@ -48,7 +48,8 @@ function setUpSettings() {
   if (header) {
     const options = (sel, extra) => { sel.innerHTML = extra; header.forEach((h, i) => { if (i === 0) return; const o = document.createElement("option"); o.value = h; o.textContent = h; sel.appendChild(o); }); };
     options($("name-column"), ""); options($("keep-taxa"), '<option value="">none</option>');
-    ticks($("flag-ranks"), header, ["species", "genus", "family"]); // shown at first: family and species where the table has them, else genus and species
+    ticks($("flag-ranks"), header, header.filter(isLevel).map((h) => h.toLowerCase()));   // every taxonomic level at first
+    // shown at first: family and species where the table has them, else genus and species
     const has = (x) => header.slice(1).find((h) => h.toLowerCase() === x), first = [has("family") || has("genus"), has("species")].filter(Boolean);
     ticks($("label-columns"), header, first.map((x) => x.toLowerCase()), (e) => {
       const v = e.target.value; labelOrder = labelOrder.filter((x) => x !== v); if (e.target.checked) labelOrder.push(v); updateLabels(); });
@@ -60,12 +61,22 @@ function setUpSettings() {
   $("mito-count").textContent = state.loaded.mitogenomes ? `(${state.loaded.mitogenomes.toLocaleString()} tips look like mitogenomes)` : "(no tip looks like a mitogenome)";
 }
 
-// a tickbox for every column of the names table but the first, those named in `on` ticked
+// taxonomic levels, from the top down: columns with these names are offered first, in this order
+const LEVELS = ["domain", "superkingdom", "kingdom", "subkingdom", "phylum", "subphylum", "superclass", "class", "subclass", "infraclass",
+  "superorder", "order", "suborder", "infraorder", "parvorder", "superfamily", "family", "subfamily", "supertribe", "tribe", "subtribe",
+  "genus", "subgenus", "species group", "species", "subspecies", "variety", "form"];
+const level = (h) => LEVELS.indexOf(h.toLowerCase().replace(/[_.]+/g, " ").trim()), isLevel = (h) => level(h) >= 0;
+// a tickbox for every column of the names table but the first, those named in `on` ticked: the taxonomic levels first,
+// from the top down, then the other columns
 function ticks(box, header, on, onchange) {
   box.innerHTML = "";
-  header.forEach((h, i) => { if (i === 0) return; const l = document.createElement("label"), c = document.createElement("input");
+  const cols = header.slice(1), levels = cols.filter(isLevel).sort((a, b) => level(a) - level(b)), others = cols.filter((h) => !isLevel(h));
+  const add = (h) => { const l = document.createElement("label"), c = document.createElement("input");
     l.className = "tick"; c.type = "checkbox"; c.value = h; c.checked = on.includes(h.toLowerCase()); if (onchange) c.onchange = onchange;
-    l.append(c, " " + h); box.appendChild(l); });
+    l.append(c, " " + h); box.appendChild(l); };
+  levels.forEach(add);
+  if (levels.length && others.length) { const s = document.createElement("span"); s.className = "hint ticks-break"; s.textContent = "other columns:"; box.appendChild(s); }
+  others.forEach(add);
 }
 const ticked = (box) => [...box.querySelectorAll("input:checked")].map((x) => x.value);
 
@@ -216,7 +227,7 @@ function showSummary(s, rows) {
       (+s.tips_not_judged > 0 ? `; ${num(s.tips_not_judged)} tips share too few sites to compare` : "") + ").", parts.map(([name, v]) => ({ name, value: v, hint: `${name}: ${pct(v)} of tips`, label: pct(v) })), "% of tips", true));
   }
   view.appendChild(figs);
-  const reasons = [["names", "the representative is the only tip of its family, genus or species, while most of the cluster shares another"], ["sequences", "the representative differs at more than 10% of sites from most of the cluster"],
+  const reasons = [["names", "the representative is the only tip of its name at a taxonomic level, while most of the cluster shares another"], ["sequences", "the representative differs at more than 10% of sites from most of the cluster"],
     ["tree", "the representative sits on one of the longest 0.1% of branches"], ["better", "the representative's sequence covers less than half the alignment, while another tip's is complete"]];
   view.appendChild(table("Table 3. Clusters to look at, by reason (a cluster can have several)", ["Reason", "Clusters"], reasons.map(([k, name]) => [name, rows.filter((r) => r[k]).length.toLocaleString()])));
 }

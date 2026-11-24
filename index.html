@@ -6,8 +6,8 @@
 <!-- the page may load nothing from elsewhere and send nothing anywhere: the files stay on this computer -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self'; connect-src 'self'; style-src 'self'; img-src 'self' data: blob:; object-src 'none'; base-uri 'none'; form-action 'none'">
 <title>cladecut</title>
-<link rel="stylesheet" href="style.css?v=7ef5d55">
-<script type="module" src="app.js?v=7ef5d55"></script>
+<link rel="stylesheet" href="style.css?v=f0413bd">
+<script type="module" src="app.js?v=f0413bd"></script>
 </head>
 <body>
 <header>
@@ -34,9 +34,9 @@
       <label>Age limit <span class="hint">optional; 1 is the cut at one level</span><input type="number" id="age-limit" min="1" step="any" placeholder="no limit"></label>
       <label class="names-only">Name column <span class="hint">tips with a name are preferred</span><select id="name-column"></select></label>
       <label class="names-only">Every name in this column keeps a representative<select id="keep-taxa"><option value="">none</option></select></label>
-      <div class="names-only field"><span class="field-title">Compare names at</span> <span class="hint">for the flags</span><div id="flag-ranks" class="ticks"></div></div>
+      <div class="names-only field"><span class="field-title">Compare names at</span> <span class="hint">for the flags; every taxonomic level at first</span><div id="flag-ranks" class="ticks"></div></div>
       <div class="names-only field"><span class="field-title">Show tips by name</span> <span class="hint">tick the names to show, in the order to show them; none shows the IDs</span><div id="label-columns" class="ticks"></div>
-        <label class="tick"><input type="checkbox" id="label-id" checked> then the ID</label>
+        <label class="tick" id="label-id-row"><input type="checkbox" id="label-id" checked> add each tip's ID after its names</label>
         <span class="hint" id="label-example"></span></div>
     </div>
     <p>
@@ -62,7 +62,7 @@
   <h2>Clusters</h2>
   <div class="filters">
     <p class="hint wide">A cluster is flagged when its representative looks plainly wrong for it. Show only flagged clusters <input type="checkbox" id="only-flagged" checked>, flagged because:</p>
-    <label class="check block"><input type="checkbox" class="kind" value="names" checked> the representative is the only tip of its family, genus or species in the cluster, while most of the cluster's named tips share another one <span id="n-names"></span></label>
+    <label class="check block"><input type="checkbox" class="kind" value="names" checked> the representative is the only tip of its name at a taxonomic level (its family, genus, species and so on) in the cluster, while most of the cluster's named tips share another one <span id="n-names"></span></label>
     <label class="check block"><input type="checkbox" class="kind" value="sequences" checked> the representative's sequence differs at more than 10% of sites from most of the other tips in the cluster <span id="n-sequences"></span></label>
     <label class="check block"><input type="checkbox" class="kind" value="tree" checked> the representative sits on one of the longest branches in the tree (the longest 0.1%) <span id="n-tree"></span></label>
     <label class="check block"><input type="checkbox" class="kind" value="better" checked> the representative's sequence covers less than half the alignment, while another tip in the cluster has a complete one <span id="n-better"></span></label>
