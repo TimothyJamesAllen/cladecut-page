@@ -1,10 +1,10 @@
 // The engine runs here, apart from the page, so that the page stays responsive. The page sends messages
 // ({ id, type, ... }) and gets one answer for each ({ id, ok, result } or { id, ok: false, error }), and progress
 // messages ({ progress: text }) on the way.
-import { createEngine, matchingTips, MITOGENOME_PATTERN } from "./engine.js?v=1662ad1";
+import { createEngine, matchingTips, MITOGENOME_PATTERN } from "./engine.js?v=7ef5d55";
 
 let engine = null, labels = [], files = {};
-const ready = fetch("cladecut.wasm?v=1662ad1").then((r) => { if (!r.ok) throw new Error("cannot load cladecut.wasm"); return r.arrayBuffer(); }).then(createEngine).then((e) => (engine = e));
+const ready = fetch("cladecut.wasm?v=7ef5d55").then((r) => { if (!r.ok) throw new Error("cannot load cladecut.wasm"); return r.arrayBuffer(); }).then(createEngine).then((e) => (engine = e));
 const progress = (text) => postMessage({ progress: text });
 
 // the bytes of a file or a text; a file compressed with gzip is read as it was before compression

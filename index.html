@@ -6,8 +6,8 @@
 <!-- the page may load nothing from elsewhere and send nothing anywhere: the files stay on this computer -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self'; connect-src 'self'; style-src 'self'; img-src 'self' data: blob:; object-src 'none'; base-uri 'none'; form-action 'none'">
 <title>cladecut</title>
-<link rel="stylesheet" href="style.css?v=1662ad1">
-<script type="module" src="app.js?v=1662ad1"></script>
+<link rel="stylesheet" href="style.css?v=7ef5d55">
+<script type="module" src="app.js?v=7ef5d55"></script>
 </head>
 <body>
 <header>
@@ -34,9 +34,10 @@
       <label>Age limit <span class="hint">optional; 1 is the cut at one level</span><input type="number" id="age-limit" min="1" step="any" placeholder="no limit"></label>
       <label class="names-only">Name column <span class="hint">tips with a name are preferred</span><select id="name-column"></select></label>
       <label class="names-only">Every name in this column keeps a representative<select id="keep-taxa"><option value="">none</option></select></label>
-      <label class="names-only">Compare names at<select id="flag-ranks" multiple size="4"></select></label>
-      <label class="names-only">Show tips by name <span class="hint">the names to show, in the order of the table</span><select id="label-columns" multiple size="4"></select>
-        <select id="label-mode"><option value="off">IDs only</option><option value="with-id" selected>names, then the ID</option><option value="names">names only (the ID where there is none)</option></select></label>
+      <div class="names-only field"><span class="field-title">Compare names at</span> <span class="hint">for the flags</span><div id="flag-ranks" class="ticks"></div></div>
+      <div class="names-only field"><span class="field-title">Show tips by name</span> <span class="hint">tick the names to show, in the order to show them; none shows the IDs</span><div id="label-columns" class="ticks"></div>
+        <label class="tick"><input type="checkbox" id="label-id" checked> then the ID</label>
+        <span class="hint" id="label-example"></span></div>
     </div>
     <p>
       <label>Correct branch lengths for rate before choosing clusters

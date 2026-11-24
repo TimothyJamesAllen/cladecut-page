@@ -69,4 +69,8 @@ svg.figure .value { fill: #0b0b0b; font-size: 11px; font-family: system-ui, -app
 table.results.pairs th { background: #f0efec; width: 1%; white-space: nowrap; border-bottom: 1px solid #e1e0d9; font-weight: 600; }
 table.results.pairs td { text-align: left; }
 svg.figure .bar-fill:hover { fill: #1c5cab; }
-#label-mode { margin-top: 6px; font: inherit; font-weight: normal; }
+.grid .field { display: flex; flex-direction: column; gap: 4px; }
+.field-title { font-weight: 600; }
+.ticks { display: flex; flex-wrap: wrap; gap: 2px 14px; max-height: 120px; overflow-y: auto; }
+.grid label.tick { flex-direction: row; align-items: center; gap: 5px; font-weight: normal; white-space: nowrap; cursor: pointer; }
+#label-example { word-break: break-all; }

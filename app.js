@@ -1,9 +1,9 @@
 // The page: files and settings, the summary, the list of clusters, one cluster, the choices, the downloads.
 // The engine runs in worker.js; this file only shows what it returns and passes on what the expert chooses.
-import { drawTree } from "./treeview.js?v=1662ad1";
+import { drawTree } from "./treeview.js?v=7ef5d55";
 
 const $ = (id) => document.getElementById(id);
-const worker = new Worker("worker.js?v=1662ad1", { type: "module" });
+const worker = new Worker("worker.js?v=7ef5d55", { type: "module" });
 let nextId = 1; const waiting = new Map();
 worker.onmessage = (e) => {
   if (e.data.progress) { status(e.data.progress); return; }
@@ -44,15 +44,30 @@ async function readFiles(files) {
 function setUpSettings() {
   $("settings").hidden = false; const header = state.loaded.header;
   for (const el of document.querySelectorAll(".names-only")) el.hidden = !header;
+  labelOrder = [];
   if (header) {
     const options = (sel, extra) => { sel.innerHTML = extra; header.forEach((h, i) => { if (i === 0) return; const o = document.createElement("option"); o.value = h; o.textContent = h; sel.appendChild(o); }); };
-    options($("name-column"), ""); options($("keep-taxa"), '<option value="">none</option>'); options($("flag-ranks"), ""); options($("label-columns"), "");
-    for (const o of $("label-columns").options) if (["family", "species"].includes(o.value.toLowerCase())) o.selected = true;
+    options($("name-column"), ""); options($("keep-taxa"), '<option value="">none</option>');
+    ticks($("flag-ranks"), header, ["species", "genus", "family"]); // shown at first: family and species where the table has them, else genus and species
+    const has = (x) => header.slice(1).find((h) => h.toLowerCase() === x), first = [has("family") || has("genus"), has("species")].filter(Boolean);
+    ticks($("label-columns"), header, first.map((x) => x.toLowerCase()), (e) => {
+      const v = e.target.value; labelOrder = labelOrder.filter((x) => x !== v); if (e.target.checked) labelOrder.push(v); updateLabels(); });
+    labelOrder = first;
     const pick = (sel, wanted) => { const o = [...sel.options].find((x) => wanted.includes(x.value.toLowerCase())); if (o) o.selected = true; };
-    pick($("name-column"), ["species"]); for (const o of $("flag-ranks").options) if (["species", "genus", "family"].includes(o.value.toLowerCase())) o.selected = true;
+    pick($("name-column"), ["species"]);
   }
+  updateLabels();
   $("mito-count").textContent = state.loaded.mitogenomes ? `(${state.loaded.mitogenomes.toLocaleString()} tips look like mitogenomes)` : "(no tip looks like a mitogenome)";
 }
+
+// a tickbox for every column of the names table but the first, those named in `on` ticked
+function ticks(box, header, on, onchange) {
+  box.innerHTML = "";
+  header.forEach((h, i) => { if (i === 0) return; const l = document.createElement("label"), c = document.createElement("input");
+    l.className = "tick"; c.type = "checkbox"; c.value = h; c.checked = on.includes(h.toLowerCase()); if (onchange) c.onchange = onchange;
+    l.append(c, " " + h); box.appendChild(l); });
+}
+const ticked = (box) => [...box.querySelectorAll("input:checked")].map((x) => x.value);
 
 // R rounds a half to the even number, as the command does
 const roundEven = (x) => { const f = Math.floor(x), d = x - f; return d > 0.5 ? f + 1 : d < 0.5 ? f : (f % 2 === 0 ? f : f + 1); };
@@ -66,11 +81,11 @@ function options(k) {
   if (state.files.names) {
     o.push(["--names", name(state.files.names)], ["--name-column", $("name-column").value]);
     if ($("keep-taxa").value) o.push(["--keep-taxa", $("keep-taxa").value]);
-    const ranks = [...$("flag-ranks").selectedOptions].map((x) => x.value); if (ranks.length) o.push(["--flag-ranks", ranks.join(",")]);
+    const ranks = ticked($("flag-ranks")); if (ranks.length) o.push(["--flag-ranks", ranks.join(",")]);
   }
   if (state.files.fasta) o.push(["--fasta", name(state.files.fasta)]);
   if (state.files.keep) o.push(["--keep", name(state.files.keep)]);
-  if (state.files.names && $("label-mode").value !== "off" && labelSpec()) o.push(["--label-columns", labelSpec()]);
+  if (state.files.names && labelSpec()) o.push(["--label-columns", labelSpec()]);
   if ($("rate").value !== "on") o.push(["--rate-correction", $("rate").value]);
   if ($("mito").checked) o.push(["--prioritize-mitogenomes", ""]);
   if ($("age-limit").value) o.push(["--age-limit", $("age-limit").value]);
@@ -80,14 +95,20 @@ function options(k) {
 }
 const splits = () => state.choices.filter((c) => c.choice === "separate").length;
 // names shown for tips: the columns chosen, and whether the ID follows
-const labelSpec = () => [...$("label-columns").selectedOptions].map((x) => x.value).join(",");
+// the names are joined in the order they were ticked
+let labelOrder = [];
+const labelSpec = () => labelOrder.join(",");
 const nameOf = (id) => state.shown[id] || id;
+let labelRequest = 0;            // only the answer to the latest change is used
 async function updateLabels() {
-  state.shown = {};
-  if (state.files.names && $("label-mode").value !== "off" && labelSpec()) {
-    const tipColumn = null;
-    try { state.shown = await ask("labels", { spec: labelSpec(), keepId: $("label-mode").value === "with-id", tipColumn }); } catch (e) { showError(e.message); } }
-  if (state.rows.length) { drawRows(); if (state.selected) openCluster(state.selected.index); }
+  const mine = ++labelRequest; let shown = {};
+  if (state.files.names && labelSpec()) {
+    try { shown = await ask("labels", { spec: labelSpec(), keepId: $("label-id").checked, tipColumn: null }); } catch (e) { showError(e.message); } }
+  if (mine !== labelRequest) return;
+  state.shown = shown;
+  const some = Object.entries(shown)[0];
+  $("label-example").textContent = some ? `for example ${some[0]} is shown as ${some[1]}` : "";
+  if (state.rows.length) { drawRows(); if (state.selected) openCluster(state.selected.index, true); }
 }
 
 let version = "";              // the version of the page, where it was bundled with one (version.txt)
@@ -114,7 +135,7 @@ async function run(fromSettings) {
     const t0 = performance.now();
     const res = await ask("run", { options: opts, choices: state.choices.length ? choicesText(command) : "" });
     const before = state.lastReps, beforeK = state.lastK;
-    state.rows = res.rows; state.report = res.report; state.lastK = res.rows.length; state.splitsAtLastRun = splits(); state.lastOptions = opts;
+    lastCluster = null; state.rows = res.rows; state.report = res.report; state.lastK = res.rows.length; state.splitsAtLastRun = splits(); state.lastOptions = opts;
     state.lastReps = new Set(res.rows.map((r) => r.rep));
     statusTarget.dataset.done = `done in ${((performance.now() - t0) / 1000).toFixed(1)} s`; status(statusTarget.dataset.done);
     $("result").hidden = false; $("report").textContent = res.report.trimEnd(); showSummary(res.summary, res.rows);
@@ -223,8 +244,10 @@ function drawRows() {
 }
 
 // ---- one cluster
-async function openCluster(index) {
-  const text = await ask("cluster", { index }); const lines = text.trimEnd().split("\n").map((l) => l.split("\t"));
+let lastCluster = null;          // the last cluster read, to draw again when the names shown change
+async function openCluster(index, again = false) {
+  const text = again && lastCluster && lastCluster.index === index ? lastCluster.text : await ask("cluster", { index });
+  lastCluster = { index, text }; const keepScroll = again ? $("tips").parentElement.scrollTop : 0; const lines = text.trimEnd().split("\n").map((l) => l.split("\t"));
   const head = lines.find((l) => l[0] === "cluster"), columns = lines.find((l) => l[0] === "columns").slice(1);
   const tips = lines.filter((l) => l[0] === "tip").map((l) => l.slice(1)), nodes = lines.filter((l) => l[0] === "node").map((l) => ({ id: +l[1], parent: +l[2], length: +l[3], kind: l[4], label: l[5], tips: +l[6] }));
   const row = state.rows[index - 1];
@@ -253,6 +276,7 @@ async function openCluster(index) {
     if (t[0] !== head[2]) { const k = document.createElement("button"); k.textContent = "make representative"; k.onclick = () => addChoice({ choice: "keep", tip: t[0], note: `instead of ${head[2]}` }); td.appendChild(k); }
     const nv = document.createElement("button"); nv.textContent = "never"; nv.title = "this tip may never be a representative"; nv.onclick = () => addChoice({ choice: "never", tip: t[0], note: "" }); td.appendChild(nv);
     r.appendChild(td); table.appendChild(r); }
+  if (again) $("tips").parentElement.scrollTop = keepScroll;
   // its part of the tree
   // a branch is drawn as part of the cluster when every tip below it is in the cluster
   const inside = new Set(tips.map((t) => t[0])), kids = new Map(), all = new Map();
@@ -325,7 +349,7 @@ function example() {
 
 // ---- wiring
 $("read-files").onclick = () => readFiles({ tree: $("tree-file").files[0] || null, names: $("names-file").files[0] || null, fasta: $("fasta-file").files[0] || null, keep: $("keep-file").files[0] || null });
-for (const id of ["label-columns", "label-mode"]) $(id).onchange = updateLabels;
+$("label-id").onchange = updateLabels;
 $("example").onclick = () => { $("size-value").value = 10; readFiles(example()); };
 $("choices-file").onchange = async () => { const f = $("choices-file").files[0]; if (!f) return; try { state.choices = readChoices(await f.text()); showChoices(); } catch (e) { showError(e.message); } };
 $("run").onclick = () => run(true);
