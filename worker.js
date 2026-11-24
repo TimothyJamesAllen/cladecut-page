@@ -1,10 +1,10 @@
 // The engine runs here, apart from the page, so that the page stays responsive. The page sends messages
 // ({ id, type, ... }) and gets one answer for each ({ id, ok, result } or { id, ok: false, error }), and progress
 // messages ({ progress: text }) on the way.
-import { createEngine, matchingTips, MITOGENOME_PATTERN } from "./engine.js?v=c9fb250";
+import { createEngine, matchingTips, MITOGENOME_PATTERN } from "./engine.js?v=1662ad1";
 
 let engine = null, labels = [], files = {};
-const ready = fetch("cladecut.wasm?v=c9fb250").then((r) => { if (!r.ok) throw new Error("cannot load cladecut.wasm"); return r.arrayBuffer(); }).then(createEngine).then((e) => (engine = e));
+const ready = fetch("cladecut.wasm?v=1662ad1").then((r) => { if (!r.ok) throw new Error("cannot load cladecut.wasm"); return r.arrayBuffer(); }).then(createEngine).then((e) => (engine = e));
 const progress = (text) => postMessage({ progress: text });
 
 // the bytes of a file or a text; a file compressed with gzip is read as it was before compression
@@ -29,13 +29,14 @@ async function loadAlignment(source) {
 
 const handlers = {
   // the files: tree (needed), names, alignment, choices; File objects or texts
-  async load({ tree, names, fasta, pattern }) {
+  async load({ tree, names, fasta, keep, pattern }) {
     await ready; files = { names: !!names, fasta: !!fasta };
     progress("reading the tree"); labels = engine.loadTree(await bytesOf(tree));
     engine.setText("mitogenomes", matchingTips(labels, pattern || MITOGENOME_PATTERN));
     let header = null;
     if (names) { progress("reading the names table"); engine.setText("names", await bytesOf(names)); header = engine.namesHeader(); }
     if (fasta) { progress("reading the alignment"); await loadAlignment(fasta); }
+    if (keep) engine.setText("keep", await bytesOf(keep));
     return { tips: labels.length, header, mitogenomes: matchingTips(labels, pattern || MITOGENOME_PATTERN).split("\n").filter(Boolean).length };
   },
   async run({ options, choices }) {
@@ -50,6 +51,9 @@ const handlers = {
   },
   async cluster({ index }) { return engine.cluster(index); },
   async where({ tip }) { return engine.clusterOf(tip); },
+  // the labels to show: an object from each tip's own label to its label by name
+  async labels({ spec, keepId, tipColumn }) { engine.setOptions(tipColumn ? [["--tip-column", tipColumn]] : []); const shown = engine.displayLabels(spec, keepId);
+    const out = {}; labels.forEach((l, i) => { if (shown[i] !== l) out[l] = shown[i]; }); return out; },
   async reference() { progress("working out reference values"); return engine.reference(10); },
   async file({ name }) { return engine.file(name); },
 };

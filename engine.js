@@ -10,7 +10,7 @@
 //
 // A failure throws an Error with the engine's reason.
 
-const FILES = { clusters: 0, medoids: 1, summary: 2, tree: 3, flags: 4, report: 5, messages: 6 };
+const FILES = { clusters: 0, medoids: 1, summary: 2, tree: 3, flags: 4, report: 5, messages: 6, named_tree: 7 };
 // the labels that count as mitogenomes unless another pattern is given (as in the command)
 export const MITOGENOME_PATTERN = "^[A-Z]{4}\\d{5}$";
 
@@ -66,6 +66,8 @@ export async function createEngine(wasmBytes) {
     namesHeader() { check(x.cc_names_header()); return output().split("\t"); },
     cluster(i) { check(x.cc_cluster(i)); return output(); },
     reference(draws = 10) { check(x.cc_reference(draws)); return Object.fromEntries(output().trim().split("\n").map((l) => { const [k, v] = l.split("\t"); return [k, +v]; })); },
+    // the labels to show for the tips, in the order of the tree: names from the columns in spec ("family,species")
+    displayLabels(spec, keepId) { check(withBytes(spec, (p, n) => x.cc_display_labels(p, n, keepId ? 1 : 0))); return output().slice(0, -1).split("\n"); },
     clusterOf(label) { return withBytes(label, (p, n) => x.cc_cluster_of(p, n)); },
     // for the tests of the build
     testDivision(variant, K, window, which) { return x.cc_test_division(variant, K, window, which); },

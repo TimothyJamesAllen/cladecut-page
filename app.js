@@ -1,9 +1,9 @@
 // The page: files and settings, the summary, the list of clusters, one cluster, the choices, the downloads.
 // The engine runs in worker.js; this file only shows what it returns and passes on what the expert chooses.
-import { drawTree } from "./treeview.js?v=c9fb250";
+import { drawTree } from "./treeview.js?v=1662ad1";
 
 const $ = (id) => document.getElementById(id);
-const worker = new Worker("worker.js?v=c9fb250", { type: "module" });
+const worker = new Worker("worker.js?v=1662ad1", { type: "module" });
 let nextId = 1; const waiting = new Map();
 worker.onmessage = (e) => {
   if (e.data.progress) { status(e.data.progress); return; }
@@ -18,7 +18,8 @@ const showError = (text) => { $("error").textContent = text; $("error").hidden =
 
 // ---- state
 const state = {
-  files: { tree: null, names: null, fasta: null },     // File objects, or { name, text } for the example
+  files: { tree: null, names: null, fasta: null, keep: null },     // File objects, or { name, text } for the example
+  shown: {},                                            // tip label -> label by name, where names are shown
   loaded: null,                                         // what the worker read: tips, header
   rows: [], report: "", selected: null, cluster: null,
   choices: [],                                          // { choice, tip, tip2, note }
@@ -32,7 +33,7 @@ async function readFiles(files) {
   const source = (f) => (f ? (typeof f.text === "string" ? f.text : f) : null);      // the example's texts, or File objects
   try {
     const t0 = performance.now();
-    state.loaded = await ask("load", { tree: source(files.tree), names: source(files.names), fasta: source(files.fasta) });
+    state.loaded = await ask("load", { tree: source(files.tree), names: source(files.names), fasta: source(files.fasta), keep: source(files.keep) });
     state.files = files;
     status(`${state.loaded.tips.toLocaleString()} tips read in ${((performance.now() - t0) / 1000).toFixed(1)} s` +
            (files.names ? "; names table read" : "") + (files.fasta ? "; alignment read" : ""));
@@ -45,7 +46,8 @@ function setUpSettings() {
   for (const el of document.querySelectorAll(".names-only")) el.hidden = !header;
   if (header) {
     const options = (sel, extra) => { sel.innerHTML = extra; header.forEach((h, i) => { if (i === 0) return; const o = document.createElement("option"); o.value = h; o.textContent = h; sel.appendChild(o); }); };
-    options($("name-column"), ""); options($("keep-taxa"), '<option value="">none</option>'); options($("flag-ranks"), "");
+    options($("name-column"), ""); options($("keep-taxa"), '<option value="">none</option>'); options($("flag-ranks"), ""); options($("label-columns"), "");
+    for (const o of $("label-columns").options) if (["family", "species"].includes(o.value.toLowerCase())) o.selected = true;
     const pick = (sel, wanted) => { const o = [...sel.options].find((x) => wanted.includes(x.value.toLowerCase())); if (o) o.selected = true; };
     pick($("name-column"), ["species"]); for (const o of $("flag-ranks").options) if (["species", "genus", "family"].includes(o.value.toLowerCase())) o.selected = true;
   }
@@ -67,6 +69,8 @@ function options(k) {
     const ranks = [...$("flag-ranks").selectedOptions].map((x) => x.value); if (ranks.length) o.push(["--flag-ranks", ranks.join(",")]);
   }
   if (state.files.fasta) o.push(["--fasta", name(state.files.fasta)]);
+  if (state.files.keep) o.push(["--keep", name(state.files.keep)]);
+  if (state.files.names && $("label-mode").value !== "off" && labelSpec()) o.push(["--label-columns", labelSpec()]);
   if ($("rate").value !== "on") o.push(["--rate-correction", $("rate").value]);
   if ($("mito").checked) o.push(["--prioritize-mitogenomes", ""]);
   if ($("age-limit").value) o.push(["--age-limit", $("age-limit").value]);
@@ -75,6 +79,16 @@ function options(k) {
   return o;
 }
 const splits = () => state.choices.filter((c) => c.choice === "separate").length;
+// names shown for tips: the columns chosen, and whether the ID follows
+const labelSpec = () => [...$("label-columns").selectedOptions].map((x) => x.value).join(",");
+const nameOf = (id) => state.shown[id] || id;
+async function updateLabels() {
+  state.shown = {};
+  if (state.files.names && $("label-mode").value !== "off" && labelSpec()) {
+    const tipColumn = null;
+    try { state.shown = await ask("labels", { spec: labelSpec(), keepId: $("label-mode").value === "with-id", tipColumn }); } catch (e) { showError(e.message); } }
+  if (state.rows.length) { drawRows(); if (state.selected) openCluster(state.selected.index); }
+}
 
 let version = "";              // the version of the page, where it was bundled with one (version.txt)
 fetch("version.txt").then((r) => (r.ok ? r.text() : "")).then((t) => { version = t.trim(); if (version) $("version").textContent = "Page: " + version; }).catch(() => {});
@@ -110,7 +124,7 @@ async function run(fromSettings) {
         (moved === 1 ? "1 representative is new" : `${moved.toLocaleString()} representatives are new`) + ", the others stay.";
       $("changed").hidden = false;
     } else $("changed").hidden = true;
-    showCounts(); showList(); showChoices(); showDownloads(command);
+    await updateLabels(); showCounts(); showList(); showChoices(); showDownloads(command);
     // show the cluster of the last choice, or else the cluster that holds the representative shown before
     const last = state.choices[state.choices.length - 1], tip = !fromSettings && last ? last.tip : state.selected && state.selected.rep;
     if (tip) { const i = await ask("where", { tip }); if (i > 0) openCluster(i); else $("cluster").hidden = true; }
@@ -191,7 +205,7 @@ let shown = [];
 function showCounts() { for (const k of ["names", "sequences", "tree", "better"]) $("n-" + k).textContent = "(" + state.rows.filter((r) => r[k]).length.toLocaleString() + ")"; }
 function showList() {
   const only = $("only-flagged").checked, kinds = [...document.querySelectorAll(".kind")].filter((x) => x.checked).map((x) => x.value), find = $("find").value.trim().toLowerCase();
-  shown = state.rows.map((r, i) => ({ ...r, index: i + 1 })).filter((r) => (!only || kinds.some((k) => r[k])) && (!find || r.id.toLowerCase() === find || r.rep.toLowerCase().includes(find)));
+  shown = state.rows.map((r, i) => ({ ...r, index: i + 1 })).filter((r) => (!only || kinds.some((k) => r[k])) && (!find || r.id.toLowerCase() === find || r.rep.toLowerCase().includes(find) || nameOf(r.rep).toLowerCase().includes(find)));
   const sort = $("sort").value;
   if (sort === "flags") shown.sort((a, b) => b.flags - a.flags || b.tips - a.tips || a.index - b.index);
   else if (sort === "tips") shown.sort((a, b) => b.tips - a.tips || a.index - b.index);
@@ -204,8 +218,8 @@ function drawRows() {
   for (const el of [...list.querySelectorAll(".item")]) el.remove();
   for (let i = first; i < last; i++) { const r = shown[i], el = document.createElement("div");
     el.className = "item" + (state.selected && state.selected.id === r.id ? " selected" : ""); el.style.top = i * 24 + "px";
-    for (const t of [r.id, r.rep, r.tips, r.flags, r.reasons.split("; ")[0] + (r.flags > 1 ? " …" : "")]) { const s = document.createElement("span"); s.textContent = t; el.appendChild(s); }
-    el.title = r.reasons.split("; ").join("\n"); el.onclick = () => openCluster(r.index); list.appendChild(el); }
+    for (const t of [r.id, nameOf(r.rep), r.tips, r.flags, r.reasons.split("; ")[0] + (r.flags > 1 ? " …" : "")]) { const s = document.createElement("span"); s.textContent = t; el.appendChild(s); }
+    el.title = (nameOf(r.rep) !== r.rep ? r.rep + "\n" : "") + r.reasons.split("; ").join("\n"); el.onclick = () => openCluster(r.index); list.appendChild(el); }
 }
 
 // ---- one cluster
@@ -215,7 +229,7 @@ async function openCluster(index) {
   const tips = lines.filter((l) => l[0] === "tip").map((l) => l.slice(1)), nodes = lines.filter((l) => l[0] === "node").map((l) => ({ id: +l[1], parent: +l[2], length: +l[3], kind: l[4], label: l[5], tips: +l[6] }));
   const row = state.rows[index - 1];
   state.selected = { id: head[1], rep: head[2], index }; drawRows();
-  $("cluster").hidden = false; $("cluster-title").textContent = `Cluster ${head[1]}: ${(+head[3]).toLocaleString()} tips, represented by ${head[2]}`;
+  $("cluster").hidden = false; $("cluster-title").textContent = `Cluster ${head[1]}: ${(+head[3]).toLocaleString()} tips, represented by ${nameOf(head[2])}`;
   $("cluster-reasons").textContent = row.reasons ? "To look at: " + row.reasons + "." : "Nothing plainly wrong here.";
   const [a, b, na, nb] = [head[4], head[5], head[6], head[7]];
   $("split").disabled = !a;
@@ -227,10 +241,12 @@ async function openCluster(index) {
   $("split").onclick = () => addChoice({ choice: "separate", tip: a, tip2: b, note: `split ${head[1]}` });
   // the table of its tips
   const table = $("tips"); table.innerHTML = ""; const tr = document.createElement("tr");
-  for (const c of [...columns, ""]) { const th = document.createElement("th"); th.textContent = c === "difference" ? "difference from the representative" : c; tr.appendChild(th); }
+  const byName = Object.keys(state.shown).length > 0;
+  for (const c of [...(byName ? ["name"] : []), ...columns, ""]) { const th = document.createElement("th"); th.textContent = c === "difference" ? "difference from the representative" : c; tr.appendChild(th); }
   table.appendChild(tr);
   const marksOf = new Map(tips.map((t) => [t[0], t[t.length - 1]]));
   for (const t of tips) { const r = document.createElement("tr"); if (t[0] === head[2]) r.className = "rep"; r.dataset.tip = t[0];
+    if (byName) r.appendChild(el("td", null, nameOf(t[0])));
     t.forEach((v, j) => { const td = document.createElement("td"); const c = columns[j];
       td.textContent = c === "difference" && v ? (100 * v).toFixed(2) + "%" : c === "coverage" && v ? Math.round(100 * v) + "%" : v; r.appendChild(td); });
     const td = document.createElement("td");
@@ -242,7 +258,7 @@ async function openCluster(index) {
   const inside = new Set(tips.map((t) => t[0])), kids = new Map(), all = new Map();
   for (const n of nodes) { if (!kids.has(n.parent)) kids.set(n.parent, []); kids.get(n.parent).push(n); }
   for (const n of [...nodes].reverse()) all.set(n.id, n.kind === "tip" ? inside.has(n.label) : n.kind === "cluster" ? false : (kids.get(n.id) || []).every((k) => all.get(k.id)));
-  const places = drawTree($("tree-view"), nodes, { representative: head[2], inCluster: (n) => all.get(n.id), marks: (l) => (inside.has(l) ? (marksOf.get(l) || "") : "") });
+  const places = drawTree($("tree-view"), nodes, { representative: head[2], inCluster: (n) => all.get(n.id), marks: (l) => (inside.has(l) ? (marksOf.get(l) || "") : ""), nameOf });
   $("tree-view").onclick = (e) => { const r = $("tree-view").getBoundingClientRect(), y = e.clientY - r.top, hit = places.find((p) => Math.abs(p.y - y) < 8); if (!hit) return;
     for (const el of table.querySelectorAll("tr")) el.classList.toggle("lit", el.dataset.tip === hit.label);
     const lit = table.querySelector("tr.lit"); if (lit) lit.scrollIntoView({ block: "nearest" }); };
@@ -272,8 +288,9 @@ function readChoices(text) {           // for the list on the page; the engine r
 // ---- downloads
 async function showDownloads(command) {
   const ul = $("downloads"); ul.innerHTML = ""; $("command").textContent = command;
-  const items = [["cladecut_clusters.csv", "clusters"], ["cladecut_medoids.csv", "medoids"], ["cladecut_summary.tsv", "summary"], ["cladecut_reduced_tree.nwk", "tree"], ["cladecut_flags.csv", "flags"]];
-  for (const [file, what] of items) { const li = document.createElement("li"); const b = document.createElement("button"); b.textContent = file;
+  const items = [["cladecut_clusters.csv", "clusters"], ["cladecut_medoids.csv", "medoids"], ["cladecut_summary.tsv", "summary"], ["cladecut_reduced_tree.nwk", "tree"], ["cladecut_flags.csv", "flags"], ["cladecut_reduced_tree_named.nwk", "named_tree"]];
+  for (const [file, what] of items) { if (what === "named_tree" && !(await ask("file", { name: what }))) continue;
+    const li = document.createElement("li"); const b = document.createElement("button"); b.textContent = file;
     b.onclick = async () => save(file, await ask("file", { name: what })); li.appendChild(b); ul.appendChild(li);
     ask("file", { name: what }).then(async (text) => { const h = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
       const code = document.createElement("code"); code.textContent = "  SHA-256 " + [...new Uint8Array(h)].map((x) => x.toString(16).padStart(2, "0")).join(""); li.appendChild(code); }); }
@@ -307,7 +324,8 @@ function example() {
 }
 
 // ---- wiring
-$("read-files").onclick = () => readFiles({ tree: $("tree-file").files[0] || null, names: $("names-file").files[0] || null, fasta: $("fasta-file").files[0] || null });
+$("read-files").onclick = () => readFiles({ tree: $("tree-file").files[0] || null, names: $("names-file").files[0] || null, fasta: $("fasta-file").files[0] || null, keep: $("keep-file").files[0] || null });
+for (const id of ["label-columns", "label-mode"]) $(id).onchange = updateLabels;
 $("example").onclick = () => { $("size-value").value = 10; readFiles(example()); };
 $("choices-file").onchange = async () => { const f = $("choices-file").files[0]; if (!f) return; try { state.choices = readChoices(await f.text()); showChoices(); } catch (e) { showError(e.message); } };
 $("run").onclick = () => run(true);
@@ -328,6 +346,6 @@ showChoices();
 const params = new URLSearchParams(location.search);
 if (params.get("tree")) {
   const get = async (key) => { const path = params.get(key); if (!path) return null; const r = await fetch(path); if (!r.ok) throw new Error("cannot load " + path); return new File([await r.blob()], path.split("/").pop()); };
-  (async () => { try { status("loading the files named in the address"); const files = { tree: await get("tree"), names: await get("names"), fasta: await get("fasta") }; await readFiles(files);
+  (async () => { try { status("loading the files named in the address"); const files = { tree: await get("tree"), names: await get("names"), fasta: await get("fasta"), keep: await get("keep") }; await readFiles(files);
     if (params.get("run")) run(true); } catch (e) { showError(e.message); } })();
 }

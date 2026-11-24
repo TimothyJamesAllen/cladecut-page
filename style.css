@@ -69,3 +69,4 @@ svg.figure .value { fill: #0b0b0b; font-size: 11px; font-family: system-ui, -app
 table.results.pairs th { background: #f0efec; width: 1%; white-space: nowrap; border-bottom: 1px solid #e1e0d9; font-weight: 600; }
 table.results.pairs td { text-align: left; }
 svg.figure .bar-fill:hover { fill: #1c5cab; }
+#label-mode { margin-top: 6px; font: inherit; font-weight: normal; }

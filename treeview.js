@@ -1,7 +1,7 @@
 // Draws the part of the tree around one cluster: its own tips in full, neighbouring clusters as triangles.
 // nodes: [{ id, parent, length, kind ("tip", "inner", "cluster"), label, tips }], the top first, a node before those
 // below it. Returns the places of the tips drawn, for clicking: [{ label, x, y }].
-export function drawTree(canvas, nodes, { representative, inCluster, marks }) {
+export function drawTree(canvas, nodes, { representative, inCluster, marks, nameOf = (l) => l }) {
   const ratio = window.devicePixelRatio || 1, width = canvas.clientWidth, rowHeight = 16;
   const byId = new Map(nodes.map((n) => [n.id, { ...n, kids: [] }]));
   let top = null; for (const n of byId.values()) { if (n.parent && byId.has(n.parent)) byId.get(n.parent).kids.push(n); else top = n; }
@@ -14,7 +14,7 @@ export function drawTree(canvas, nodes, { representative, inCluster, marks }) {
   canvas.style.height = height + "px"; canvas.width = width * ratio; canvas.height = height * ratio;
   const g = canvas.getContext("2d"); g.setTransform(ratio, 0, 0, ratio, 0, 0); g.clearRect(0, 0, width, height);
   g.font = "12px system-ui, sans-serif"; g.textBaseline = "middle";
-  const labelSpace = 230, scale = deepest > 0 ? (width - labelSpace - 20) / deepest : 0;
+  const labelSpace = Math.min(420, 30 + 6.5 * Math.max(10, ...nodes.filter((n) => n.kind === "tip").map((n) => nameOf(n.label).length))), scale = deepest > 0 ? (width - labelSpace - 20) / deepest : 0;
   const X = (d) => 10 + d * scale, Y = (row) => 10 + row * rowHeight + rowHeight / 2;
   const places = [];
   (function draw(n) {
@@ -31,7 +31,7 @@ export function drawTree(canvas, nodes, { representative, inCluster, marks }) {
     const isRep = n.label === representative, m = marks(n.label);
     g.fillStyle = isRep ? "#b3261e" : "#1f5fbf"; g.beginPath(); g.arc(x, y, isRep ? 4.5 : 3, 0, 2 * Math.PI); g.fill();
     g.fillStyle = isRep ? "#b3261e" : "#222"; g.font = (isRep ? "bold " : "") + "12px system-ui, sans-serif";
-    g.fillText(n.label + (m ? "  " + m : ""), x + 8, y); g.font = "12px system-ui, sans-serif";
+    g.fillText(nameOf(n.label) + (m ? "  " + m : ""), x + 8, y); g.font = "12px system-ui, sans-serif";
     places.push({ label: n.label, x, y });
   })(top);
   return places;

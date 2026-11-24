@@ -6,8 +6,8 @@
 <!-- the page may load nothing from elsewhere and send nothing anywhere: the files stay on this computer -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self'; connect-src 'self'; style-src 'self'; img-src 'self' data: blob:; object-src 'none'; base-uri 'none'; form-action 'none'">
 <title>cladecut</title>
-<link rel="stylesheet" href="style.css?v=c9fb250">
-<script type="module" src="app.js?v=c9fb250"></script>
+<link rel="stylesheet" href="style.css?v=1662ad1">
+<script type="module" src="app.js?v=1662ad1"></script>
 </head>
 <body>
 <header>
@@ -22,6 +22,7 @@
     <label>Names table <span class="hint">optional; tab or comma separated, may be gzipped</span><input type="file" id="names-file"></label>
     <label>Alignment <span class="hint">optional; aligned FASTA, may be gzipped</span><input type="file" id="fasta-file"></label>
     <label>Choices <span class="hint">optional; a choices file saved earlier</span><input type="file" id="choices-file"></label>
+    <label>Tips that must be representatives <span class="hint">optional; a list, one tip per line</span><input type="file" id="keep-file"></label>
   </div>
   <p><button id="read-files">Read the files</button> <button id="example" class="quiet">Try a small simulated example</button> <span id="files-status" class="status"></span></p>
 
@@ -34,6 +35,8 @@
       <label class="names-only">Name column <span class="hint">tips with a name are preferred</span><select id="name-column"></select></label>
       <label class="names-only">Every name in this column keeps a representative<select id="keep-taxa"><option value="">none</option></select></label>
       <label class="names-only">Compare names at<select id="flag-ranks" multiple size="4"></select></label>
+      <label class="names-only">Show tips by name <span class="hint">the names to show, in the order of the table</span><select id="label-columns" multiple size="4"></select>
+        <select id="label-mode"><option value="off">IDs only</option><option value="with-id" selected>names, then the ID</option><option value="names">names only (the ID where there is none)</option></select></label>
     </div>
     <p>
       <label>Correct branch lengths for rate before choosing clusters
