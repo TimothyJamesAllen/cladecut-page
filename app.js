@@ -1,9 +1,9 @@
 // The page: files and settings, the summary, the list of clusters, one cluster, the choices, the downloads.
 // The engine runs in worker.js; this file only shows what it returns and passes on what the expert chooses.
-import { drawTree } from "./treeview.js?v=f0413bd";
+import { drawTree } from "./treeview.js?v=ef0abf6";
 
 const $ = (id) => document.getElementById(id);
-const worker = new Worker("worker.js?v=f0413bd", { type: "module" });
+const worker = new Worker("worker.js?v=ef0abf6", { type: "module" });
 let nextId = 1; const waiting = new Map();
 worker.onmessage = (e) => {
   if (e.data.progress) { status(e.data.progress); return; }
