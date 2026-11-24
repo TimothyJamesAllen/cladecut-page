@@ -1,5 +1,7 @@
 # cladecut in your browser
 
+**Open the page: https://timothyjamesallen.github.io/cladecut-page/**
+
 A web page that reduces a large phylogenetic tree to representative tips, points out the clusters whose
 representative are potentially wrong, and lets you make choices for the next run.
 
@@ -12,7 +14,7 @@ the least possible.
 
 ## How to use it
 
-1. **Open the page** in a desktop browser (Chrome, Firefox, Safari or Edge). A tree of 500,000 tips with names and
+1. **[Open the page](https://timothyjamesallen.github.io/cladecut-page/)** in a desktop browser (Chrome, Firefox, Safari or Edge). A tree of 500,000 tips with names and
    an alignment needs about 1 GB of memory; a laptop is enough, a phone is not.
 2. **Load your files**: the tree (Newick, rooted, with branch lengths), and if you have them a names table (a
    header line and one row per tip, for example with columns for family, genus and species) and an aligned FASTA
