@@ -1,9 +1,9 @@
 // The page: files and settings, the summary, the list of clusters, one cluster, the choices, the downloads.
 // The engine runs in worker.js; this file only shows what it returns and passes on what the expert chooses.
-import { drawTree } from "./treeview.js?v=23a4f0e";
+import { drawTree } from "./treeview.js?v=f80e29a";
 
 const $ = (id) => document.getElementById(id);
-const worker = new Worker("worker.js?v=23a4f0e", { type: "module" });
+const worker = new Worker("worker.js?v=f80e29a", { type: "module" });
 let nextId = 1; const waiting = new Map();
 worker.onmessage = (e) => {
   if (e.data.progress) { status(e.data.progress); return; }
@@ -102,7 +102,7 @@ async function run(fromSettings) {
     const before = state.lastReps, beforeK = state.lastK;
     state.rows = res.rows; state.report = res.report; state.lastK = res.rows.length; state.splitsAtLastRun = splits(); state.lastOptions = opts;
     state.lastReps = new Set(res.rows.map((r) => r.rep));
-    status(`done in ${((performance.now() - t0) / 1000).toFixed(1)} s`);
+    statusTarget.dataset.done = `done in ${((performance.now() - t0) / 1000).toFixed(1)} s`; status(statusTarget.dataset.done);
     $("result").hidden = false; $("report").textContent = res.report.trimEnd(); showSummary(res.summary, res.rows);
     if (before && !fromSettings) {
       const moved = [...state.lastReps].filter((r) => !before.has(r)).length;
@@ -118,56 +118,73 @@ async function run(fromSettings) {
   for (const b of document.querySelectorAll("button")) b.disabled = false;
 }
 
-// ---- the summary, as figures and bars
+// ---- the results: plain tables and numbered figures
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
 const pct = (x) => (x === 0 || x === 100 ? x.toFixed(0) : x.toFixed(1)) + "%";
-function tile(label, value, note, share) {             // a stat tile; share (0-100) draws a meter under the value
-  const t = el("div", "tile"); t.appendChild(el("div", "tile-label", label)); t.appendChild(el("div", "tile-value", value));
-  if (share !== undefined) { const m = el("div", "meter"); const f = el("div", "meter-fill"); f.style.width = Math.max(0, Math.min(100, share)) + "%"; m.appendChild(f); t.appendChild(m); }
-  if (note) t.appendChild(el("div", "tile-note", note));
-  return t;
+const sig = (x) => (+x).toPrecision(3);
+function table(caption, head, rows, note) {
+  const box = el("div", "result-block"); box.appendChild(el("h3", null, caption));
+  const t = el("table", "results" + (head ? "" : " pairs"));
+  if (head) { const tr = el("tr"); for (const h of head) tr.appendChild(el("th", null, h)); t.appendChild(tr); }
+  for (const r of rows) { const row = el("tr"); r.forEach((v, j) => row.appendChild(el(j === 0 && !head ? "th" : "td", j === 0 || !head ? null : "num", v))); t.appendChild(row); }
+  box.appendChild(t); if (note) box.appendChild(el("p", "hint", note)); return box;
 }
-function barList(title, note, items) {                 // [{ name, value, figure, hint }]: one row per item, bars on one scale
-  const box = el("div", "chart"); box.appendChild(el("h3", null, title)); if (note) box.appendChild(el("p", "hint", note));
-  const top = Math.max(...items.map((i) => i.value), 1);
-  for (const i of items) { const row = el("div", "bar-row"); row.title = i.hint || `${i.name}: ${i.figure}`;
-    row.appendChild(el("span", "bar-name", i.name)); const track = el("span", "bar-track"); const bar = el("span", "bar"); bar.style.width = (100 * i.value / top) + "%";
-    track.appendChild(bar); row.appendChild(track); row.appendChild(el("span", "bar-figure", i.figure)); box.appendChild(row); }
-  return box;
+let figures = 0;
+function histogram(caption, items, yLabel, labels) {  // items: [{ name, value, hint, label }]; vertical bars on one axis from zero; labels: print each value above its bar
+  const W = 520, H = 200, left = 56, bottom = 34, top = 10, right = 10, w = W - left - right, h = H - top - bottom;
+  const max = Math.max(...items.map((i) => i.value), 1), step = Math.pow(10, Math.floor(Math.log10(max))), unit = max / step > 5 ? step * 2 : max / step > 2 ? step : step / 2;
+  const ticks = []; for (let y = 0; y <= max + 1e-9; y += unit) ticks.push(y); const ymax = ticks[ticks.length - 1] < max ? ticks[ticks.length - 1] + unit : ticks[ticks.length - 1];
+  if (ticks[ticks.length - 1] < ymax) ticks.push(ymax);
+  const ns = "http://www.w3.org/2000/svg", svg = document.createElementNS(ns, "svg"); svg.setAttribute("viewBox", `0 0 ${W} ${H}`); svg.setAttribute("class", "figure");
+  const add = (tag, attrs, text) => { const e = document.createElementNS(ns, tag); for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v); if (text !== undefined) e.textContent = text; svg.appendChild(e); return e; };
+  const Y = (v) => top + h - (h * v) / ymax, slot = w / items.length;
+  for (const t of ticks) { add("line", { x1: left, x2: left + w, y1: Y(t), y2: Y(t), class: t === 0 ? "axis" : "grid" }); add("text", { x: left - 6, y: Y(t) + 4, class: "tick", "text-anchor": "end" }, t.toLocaleString()); }
+  items.forEach((it, i) => { const x = left + i * slot + slot * 0.18, bw = slot * 0.64, y = Y(it.value);
+    const bar = add("rect", { x, y, width: bw, height: Math.max(0, top + h - y), class: "bar-fill" }); const tip = document.createElementNS(ns, "title"); tip.textContent = it.hint || `${it.name}: ${it.value.toLocaleString()}`; bar.appendChild(tip);
+    add("text", { x: x + bw / 2, y: top + h + 16, class: "tick", "text-anchor": "middle" }, it.name);
+    if (labels) add("text", { x: x + bw / 2, y: y - 4, class: "value", "text-anchor": "middle" }, it.label); });
+  add("text", { x: 14, y: top + h / 2, class: "tick", transform: `rotate(-90 14 ${top + h / 2})`, "text-anchor": "middle" }, yLabel);
+  const box = el("figure", "result-block"); box.appendChild(svg); box.appendChild(el("figcaption", null, `Figure ${++figures}. ${caption}`)); return box;
 }
 function showSummary(s, rows) {
-  const view = $("summary-view"); view.innerHTML = ""; const n = +s.tips, K = +s.K, num = (x) => (+x).toLocaleString();
-  const hero = el("div", "hero"); hero.appendChild(el("span", "hero-figure", num(K)));
-  hero.appendChild(el("span", "hero-text", ` representatives for ${num(n)} tips (${pct(100 * K / n)} kept)`)); view.appendChild(hero);
-  const strength = +s.rate_correction;
-  view.appendChild(el("p", "hint", (strength >= 1 ? "Clusters chosen with branch lengths corrected for rate." : strength > 0 ? `Clusters chosen with branch lengths corrected for rate part way (${strength}).` : "Clusters chosen on the tree's own branch lengths.") +
-    " Every cluster is a whole clade, represented by its central tip." + (s.exact === "TRUE" ? "" : " (The search could not certify this division as the best.)")));
-  const tiles = el("div", "tiles");
-  tiles.appendChild(tile("Branch length kept", pct(+s.pd_kept_pct), "share of the tree's branch length that the representatives span", +s.pd_kept_pct));
-  tiles.appendChild(tile("Mean distance to the representative", (+s.mean_distance_to_representative).toPrecision(3), "summed tree distance from each tip to its representative, divided by the tips"));
-  tiles.appendChild(tile("Largest cluster", num(s.largest_cluster) + " tips"));
-  tiles.appendChild(tile("Clusters of one tip", pct(+s.singletons_pct), null, +s.singletons_pct));
-  const flagged = rows.filter((r) => r.flags > 0).length;
-  tiles.appendChild(tile("Clusters to look at", num(flagged), `${pct(100 * flagged / K)} of clusters; ${num(rows.filter((r) => r.flags >= 2).length)} with two reasons or more`, 100 * flagged / K));
-  if (+s.taxa_kept > 0) tiles.appendChild(tile("Names kept", num(s.taxa_kept), "every name in the chosen column has a representative"));
-  view.appendChild(tiles);
-  const charts = el("div", "charts");
-  // cluster sizes, in ordered bins
-  const bins = [[1, 1, "1 tip"], [2, 2, "2"], [3, 5, "3–5"], [6, 10, "6–10"], [11, 20, "11–20"], [21, 50, "21–50"], [51, 100, "51–100"], [101, 500, "101–500"], [501, Infinity, "more than 500"]];
-  const sizes = bins.map(([lo, hi, name]) => { const inBin = rows.filter((r) => r.tips >= lo && r.tips <= hi); const tips = inBin.reduce((a, r) => a + r.tips, 0);
-    return { name, value: inBin.length, figure: num(inBin.length), hint: `${num(inBin.length)} clusters of ${name === "1 tip" ? "one tip" : name + " tips"}, holding ${num(tips)} tips (${pct(100 * tips / n)})` }; }).filter((b) => b.value > 0);
-  charts.appendChild(barList("Cluster sizes", "number of clusters of each size", sizes));
-  // how far the tips are from their representative in sequence
+  const view = $("summary-view"); view.innerHTML = ""; figures = 0; const n = +s.tips, K = +s.K, num = (x) => (+x).toLocaleString();
+  const strength = +s.rate_correction, flagged = rows.filter((r) => r.flags > 0).length;
+  const run = [["Tips in the tree", num(n)], ["Representatives (K)", `${num(K)} (${pct(100 * K / n)} of the tips)`],
+    ["Clusters chosen on", strength >= 1 ? "branch lengths corrected for rate" : strength > 0 ? `branch lengths corrected for rate part way (${strength})` : "the tree's own branch lengths"],
+    ["Largest cluster", num(s.largest_cluster) + " tips"], ["Clusters of one tip", `${num(rows.filter((r) => r.tips === 1).length)} (${pct(+s.singletons_pct)})`]];
+  if (+s.taxa_kept > 0) run.push(["Names kept, each with a representative", num(s.taxa_kept)]);
+  if (+s.kept_tips > 0) run.push(["Tips kept as representatives", num(s.kept_tips)]);
+  if (s.never_tips) run.push(["Tips that may never be representatives", num(s.never_tips)]);
+  if (s.pairs_separated) run.push(["Pairs of tips kept apart", num(s.pairs_separated)]);
+  run.push(["Clusters to look at", `${num(flagged)} (${pct(100 * flagged / K)}); ${num(rows.filter((r) => r.flags >= 2).length)} with two reasons or more`]);
+  run.push(["Exact", s.exact === "TRUE" ? "yes: the best division for these settings" : "not certified"]);
+  view.appendChild(table("Table 1. Run summary", null, run));
+  // how good: against random tips and against the best whole clades can do (filled in when worked out)
+  const ref = el("div"); ref.id = "reference"; ref.appendChild(table("Table 2. How good is the reduction?", ["Measure (on the tree's own branch lengths)", "This run", "Random tips", "Best with whole clades"],
+    [["Mean distance from a tip to the nearest representative", sig(s.mean_distance_to_representative), "…", "–"], ["Mean distance from a tip to its own cluster's representative", sig(s.mean_distance_to_representative), "…", "…"], ["Branch length kept", pct(+s.pd_kept_pct), "…", "…"]],
+    "Working out the reference values…")); view.appendChild(ref);
+  ask("reference").then((r) => { ref.innerHTML = ""; ref.appendChild(table("Table 2. How good is the reduction?", ["Measure (on the tree's own branch lengths)", "This run", `Random tips (${num(K)}, mean of 10 draws)`, "Best with whole clades"],
+    [["Mean distance from a tip to the nearest representative (lower is better)", sig(r.nearest), sig(r.random_nearest), "–"],
+     ["Mean distance from a tip to its own cluster's representative (lower is better)", sig(r.own), "–", sig(r.lowest_own)],
+     ["Branch length kept (higher is better)", pct(r.pd), pct(r.random_pd), pct(r.highest_pd)]],
+    `This run's representatives are ${(r.random_nearest / r.nearest).toFixed(1)} times closer to the tips than ${num(K)} tips drawn at random. ` +
+    "The best values with whole clades come from two different divisions: the lowest distance from clusters chosen on the tree's own branch lengths with central tips, the most branch length from the tips farthest from each clade's ancestor. They cannot both be reached at once. With the correction for rate on, or with named, preferred or kept tips as representatives, the distance is a little higher by design."));
+    status(statusTarget.dataset.done || ""); }).catch(() => { ref.querySelector(".hint").textContent = "The reference values could not be worked out."; status(statusTarget.dataset.done || ""); });
+  // figures
+  const figs = el("div", "figures");
+  const bins = [[1, 1, "1"], [2, 2, "2"], [3, 5, "3–5"], [6, 10, "6–10"], [11, 20, "11–20"], [21, 50, "21–50"], [51, 100, "51–100"], [101, 500, "101–500"], [501, Infinity, ">500"]];
+  figs.appendChild(histogram("Cluster sizes: the number of clusters of each size (tips per cluster).", bins.map(([lo, hi, name]) => { const inBin = rows.filter((r) => r.tips >= lo && r.tips <= hi); const tips = inBin.reduce((a, r) => a + r.tips, 0);
+    return { name, value: inBin.length, hint: `${inBin.length.toLocaleString()} clusters of ${name} tips, holding ${tips.toLocaleString()} tips (${pct(100 * tips / n)})` }; }), "clusters"));
   if (s.identical_to_representative_pct !== undefined && s.identical_to_representative_pct !== "") {
     const I = +s.identical_to_representative_pct, w1 = +s["within_0.01_pct"], w2 = +s["within_0.022_pct"], w5 = +s["within_0.05_pct"];
-    const parts = [["identical", I], ["up to 1%", w1 - I], ["1–2.2%", w2 - w1], ["2.2–5%", w5 - w2], ["more than 5%", 100 - w5]];
-    charts.appendChild(barList("Difference from the representative in sequence", `share of tips, by the share of sites that differ (representatives count as identical)` +
-      (+s.tips_not_judged > 0 ? `; ${num(s.tips_not_judged)} tips share too few sites to compare` : ""), parts.map(([name, v]) => ({ name, value: v, figure: pct(v) }))));
+    const parts = [["identical", I], ["≤1%", w1 - I], ["1–2.2%", w2 - w1], ["2.2–5%", w5 - w2], [">5%", 100 - w5]];
+    figs.appendChild(histogram(`Difference from the representative in sequence: the share of tips by the share of sites that differ (representatives count as identical; mean ${pct(100 * +s.mean_sequence_distance_to_representative)}` +
+      (+s.tips_not_judged > 0 ? `; ${num(s.tips_not_judged)} tips share too few sites to compare` : "") + ").", parts.map(([name, v]) => ({ name, value: v, hint: `${name}: ${pct(v)} of tips`, label: pct(v) })), "% of tips", true));
   }
-  // clusters to look at, by reason
-  const reasons = [["names", "only tip of its name"], ["sequences", "far in sequence"], ["tree", "longest branches"], ["better", "incomplete sequence"]];
-  charts.appendChild(barList("Clusters to look at, by reason", "a cluster can have several reasons", reasons.map(([k, name]) => { const c = rows.filter((r) => r[k]).length; return { name, value: c, figure: num(c) }; })));
-  view.appendChild(charts);
+  view.appendChild(figs);
+  const reasons = [["names", "the representative is the only tip of its family, genus or species, while most of the cluster shares another"], ["sequences", "the representative differs at more than 10% of sites from most of the cluster"],
+    ["tree", "the representative sits on one of the longest 0.1% of branches"], ["better", "the representative's sequence covers less than half the alignment, while another tip's is complete"]];
+  view.appendChild(table("Table 3. Clusters to look at, by reason (a cluster can have several)", ["Reason", "Clusters"], reasons.map(([k, name]) => [name, rows.filter((r) => r[k]).length.toLocaleString()])));
 }
 
 // ---- the list of clusters (only the rows in view are drawn)

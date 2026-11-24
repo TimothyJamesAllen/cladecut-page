@@ -65,6 +65,7 @@ export async function createEngine(wasmBytes) {
     rows() { check(x.cc_rows()); return output(); },
     namesHeader() { check(x.cc_names_header()); return output().split("\t"); },
     cluster(i) { check(x.cc_cluster(i)); return output(); },
+    reference(draws = 10) { check(x.cc_reference(draws)); return Object.fromEntries(output().trim().split("\n").map((l) => { const [k, v] = l.split("\t"); return [k, +v]; })); },
     clusterOf(label) { return withBytes(label, (p, n) => x.cc_cluster_of(p, n)); },
     // for the tests of the build
     testDivision(variant, K, window, which) { return x.cc_test_division(variant, K, window, which); },
