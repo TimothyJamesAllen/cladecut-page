@@ -1,9 +1,9 @@
 // The page: files and settings, the summary, the list of clusters, one cluster, the choices, the downloads.
 // The engine runs in worker.js; this file only shows what it returns and passes on what the expert chooses.
-import { drawTree } from "./treeview.js?v=f80e29a";
+import { drawTree } from "./treeview.js?v=c9fb250";
 
 const $ = (id) => document.getElementById(id);
-const worker = new Worker("worker.js?v=f80e29a", { type: "module" });
+const worker = new Worker("worker.js?v=c9fb250", { type: "module" });
 let nextId = 1; const waiting = new Map();
 worker.onmessage = (e) => {
   if (e.data.progress) { status(e.data.progress); return; }
@@ -159,16 +159,15 @@ function showSummary(s, rows) {
   run.push(["Clusters to look at", `${num(flagged)} (${pct(100 * flagged / K)}); ${num(rows.filter((r) => r.flags >= 2).length)} with two reasons or more`]);
   run.push(["Exact", s.exact === "TRUE" ? "yes: the best division for these settings" : "not certified"]);
   view.appendChild(table("Table 1. Run summary", null, run));
-  // how good: against random tips and against the best whole clades can do (filled in when worked out)
-  const ref = el("div"); ref.id = "reference"; ref.appendChild(table("Table 2. How good is the reduction?", ["Measure (on the tree's own branch lengths)", "This run", "Random tips", "Best with whole clades"],
-    [["Mean distance from a tip to the nearest representative", sig(s.mean_distance_to_representative), "…", "–"], ["Mean distance from a tip to its own cluster's representative", sig(s.mean_distance_to_representative), "…", "…"], ["Branch length kept", pct(+s.pd_kept_pct), "…", "…"]],
+  // how good: against the same number of tips drawn at random (filled in when worked out)
+  const ref = el("div"); ref.id = "reference";
+  const head = ["Measure (on the tree's own branch lengths)", "This run", `Random tips (${num(K)}, mean of 10 draws)`];
+  ref.appendChild(table("Table 2. How good is the reduction?", head, [["Mean distance from a tip to the nearest representative (lower is better)", "…", "…"], ["Branch length kept (higher is better)", pct(+s.pd_kept_pct), "…"]],
     "Working out the reference values…")); view.appendChild(ref);
-  ask("reference").then((r) => { ref.innerHTML = ""; ref.appendChild(table("Table 2. How good is the reduction?", ["Measure (on the tree's own branch lengths)", "This run", `Random tips (${num(K)}, mean of 10 draws)`, "Best with whole clades"],
-    [["Mean distance from a tip to the nearest representative (lower is better)", sig(r.nearest), sig(r.random_nearest), "–"],
-     ["Mean distance from a tip to its own cluster's representative (lower is better)", sig(r.own), "–", sig(r.lowest_own)],
-     ["Branch length kept (higher is better)", pct(r.pd), pct(r.random_pd), pct(r.highest_pd)]],
-    `This run's representatives are ${(r.random_nearest / r.nearest).toFixed(1)} times closer to the tips than ${num(K)} tips drawn at random. ` +
-    "The best values with whole clades come from two different divisions: the lowest distance from clusters chosen on the tree's own branch lengths with central tips, the most branch length from the tips farthest from each clade's ancestor. They cannot both be reached at once. With the correction for rate on, or with named, preferred or kept tips as representatives, the distance is a little higher by design."));
+  ask("reference").then((r) => { ref.innerHTML = ""; ref.appendChild(table("Table 2. How good is the reduction?", head,
+    [["Mean distance from a tip to the nearest representative (lower is better)", sig(r.nearest), sig(r.random_nearest)], ["Branch length kept (higher is better)", pct(r.pd), pct(r.random_pd)]],
+    (r.random_nearest > r.nearest ? `This run's representatives are ${(r.random_nearest / r.nearest).toFixed(1)} times closer to the tips than ${num(K)} tips drawn at random. ` : `On this tree, ${num(K)} tips drawn at random are as close to the tips as this run's representatives. `) +
+    (r.pd >= r.random_pd ? `They span ${(r.pd / r.random_pd).toFixed(1)} times as much of the tree's branch length.` : `Random tips span a little more of the tree's branch length (${pct(r.random_pd)} against ${pct(r.pd)}): the representatives are chosen to be close to the tips they stand for, not to span the most length.`)));
     status(statusTarget.dataset.done || ""); }).catch(() => { ref.querySelector(".hint").textContent = "The reference values could not be worked out."; status(statusTarget.dataset.done || ""); });
   // figures
   const figs = el("div", "figures");
