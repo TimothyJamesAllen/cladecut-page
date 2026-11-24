@@ -17,6 +17,8 @@ button.primary { background: #1f5fbf; color: #fff; border-color: #1f5fbf; }
 button.quiet { background: #fff; }
 button:disabled { opacity: 0.5; cursor: default; }
 .status { color: #555; margin-left: 8px; }
+#settings > p > label:not(.check) { display: block; font-weight: 600; margin-bottom: 8px; }
+#settings select#rate { display: block; font: inherit; font-weight: normal; margin-top: 4px; max-width: 100%; }
 .error { color: #b3261e; background: #fbeceb; padding: 8px 10px; border-radius: 3px; white-space: pre-wrap; }
 .changed { background: #eef4ec; padding: 8px 10px; border-radius: 3px; }
 pre { background: #f7f7f7; padding: 10px; overflow-x: auto; font-size: 12.5px; white-space: pre-wrap; }

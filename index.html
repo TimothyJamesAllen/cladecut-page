@@ -36,7 +36,12 @@
       <label class="names-only">Compare names at<select id="flag-ranks" multiple size="4"></select></label>
     </div>
     <p>
-      <label class="check"><input type="checkbox" id="rate" checked> choose clusters on the scale of relative evolutionary divergence</label>
+      <label>Correct branch lengths for rate before choosing clusters
+        <select id="rate">
+          <option value="on" selected>on (recommended): fast-evolving lineages and misplaced tips do not pull the clusters around</option>
+          <option value="0.5">half way</option>
+          <option value="off">off: clusters on the branch lengths as they are; keeps the most branch length</option>
+        </select></label>
       <label class="check"><input type="checkbox" id="mito"> prefer mitogenomes as representatives <span class="hint" id="mito-count"></span></label>
     </p>
     <p><button id="run" class="primary">Run</button> <span id="run-status" class="status"></span></p>

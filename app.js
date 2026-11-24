@@ -67,7 +67,7 @@ function options(k) {
     const ranks = [...$("flag-ranks").selectedOptions].map((x) => x.value); if (ranks.length) o.push(["--flag-ranks", ranks.join(",")]);
   }
   if (state.files.fasta) o.push(["--fasta", name(state.files.fasta)]);
-  if (!$("rate").checked) o.push(["--no-rate-correction", ""]);
+  if ($("rate").value !== "on") o.push(["--rate-correction", $("rate").value]);
   if ($("mito").checked) o.push(["--prioritize-mitogenomes", ""]);
   if ($("age-limit").value) o.push(["--age-limit", $("age-limit").value]);
   if (state.choices.length) o.push(["--choices", "choices.tsv"]);
