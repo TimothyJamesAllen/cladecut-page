@@ -21,6 +21,8 @@ button:disabled { opacity: 0.5; cursor: default; }
 #settings select#rate { display: block; font: inherit; font-weight: normal; margin-top: 4px; max-width: 100%; }
 .error { color: #b3261e; background: #fbeceb; padding: 8px 10px; border-radius: 3px; white-space: pre-wrap; }
 .changed { background: #eef4ec; padding: 8px 10px; border-radius: 3px; }
+details { margin: 10px 0; }
+details summary { cursor: pointer; color: #52514e; }
 pre { background: #f7f7f7; padding: 10px; overflow-x: auto; font-size: 12.5px; white-space: pre-wrap; }
 .filters { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 4px; margin-bottom: 8px; }
 .filters select, .filters input { font: inherit; padding: 2px 4px; }
@@ -46,3 +48,24 @@ td button { padding: 1px 6px; font-size: 12px; }
 #downloads li { margin: 3px 0; }
 #downloads code { color: #777; font-size: 11.5px; }
 footer { margin-top: 40px; border-top: 1px solid #eee; padding-top: 8px; }
+
+/* the summary: a headline, figures, and bar lists on one scale each */
+.hero { margin: 4px 0 2px; color: #0b0b0b; }
+.hero-figure { font-size: 40px; font-weight: 600; letter-spacing: -0.5px; }
+.hero-text { font-size: 17px; color: #52514e; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; margin: 14px 0; }
+.tile { border: 1px solid rgba(11,11,11,0.10); border-radius: 6px; padding: 10px 12px; background: #fcfcfb; }
+.tile-label { color: #52514e; font-size: 12.5px; }
+.tile-value { font-size: 24px; font-weight: 600; color: #0b0b0b; margin: 2px 0 4px; }
+.tile-note { color: #898781; font-size: 11.5px; line-height: 1.35; margin-top: 4px; }
+.meter { height: 8px; border-radius: 4px; background: #cde2fb; overflow: hidden; }
+.meter-fill { height: 100%; border-radius: 4px; background: #2a78d6; }
+.charts { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px 24px; margin: 6px 0 10px; }
+.chart h3 { font-size: 14px; margin: 0 0 2px; }
+.chart .hint { margin: 0 0 8px; }
+.bar-row { display: grid; grid-template-columns: 130px 1fr 62px; align-items: center; gap: 8px; height: 22px; font-size: 12.5px; }
+.bar-name { color: #52514e; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bar-track { height: 12px; }
+.bar { display: block; height: 12px; min-width: 2px; background: #2a78d6; border-radius: 0 4px 4px 0; }
+.bar-figure { color: #0b0b0b; font-variant-numeric: tabular-nums; }
+.bar-row:hover .bar { background: #1c5cab; }

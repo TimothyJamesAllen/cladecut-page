@@ -1,9 +1,9 @@
 // The page: files and settings, the summary, the list of clusters, one cluster, the choices, the downloads.
 // The engine runs in worker.js; this file only shows what it returns and passes on what the expert chooses.
-import { drawTree } from "./treeview.js";
+import { drawTree } from "./treeview.js?v=23a4f0e";
 
 const $ = (id) => document.getElementById(id);
-const worker = new Worker("worker.js", { type: "module" });
+const worker = new Worker("worker.js?v=23a4f0e", { type: "module" });
 let nextId = 1; const waiting = new Map();
 worker.onmessage = (e) => {
   if (e.data.progress) { status(e.data.progress); return; }
@@ -103,7 +103,7 @@ async function run(fromSettings) {
     state.rows = res.rows; state.report = res.report; state.lastK = res.rows.length; state.splitsAtLastRun = splits(); state.lastOptions = opts;
     state.lastReps = new Set(res.rows.map((r) => r.rep));
     status(`done in ${((performance.now() - t0) / 1000).toFixed(1)} s`);
-    $("result").hidden = false; $("report").textContent = res.report.trimEnd();
+    $("result").hidden = false; $("report").textContent = res.report.trimEnd(); showSummary(res.summary, res.rows);
     if (before && !fromSettings) {
       const moved = [...state.lastReps].filter((r) => !before.has(r)).length;
       $("changed").textContent = `What changed: ${beforeK.toLocaleString()} → ${state.lastK.toLocaleString()} representatives; ` +
@@ -116,6 +116,58 @@ async function run(fromSettings) {
     if (tip) { const i = await ask("where", { tip }); if (i > 0) openCluster(i); else $("cluster").hidden = true; }
   } catch (e) { showError("The run could not be done, and the previous result is kept: " + e.message); status(""); }
   for (const b of document.querySelectorAll("button")) b.disabled = false;
+}
+
+// ---- the summary, as figures and bars
+const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
+const pct = (x) => (x === 0 || x === 100 ? x.toFixed(0) : x.toFixed(1)) + "%";
+function tile(label, value, note, share) {             // a stat tile; share (0-100) draws a meter under the value
+  const t = el("div", "tile"); t.appendChild(el("div", "tile-label", label)); t.appendChild(el("div", "tile-value", value));
+  if (share !== undefined) { const m = el("div", "meter"); const f = el("div", "meter-fill"); f.style.width = Math.max(0, Math.min(100, share)) + "%"; m.appendChild(f); t.appendChild(m); }
+  if (note) t.appendChild(el("div", "tile-note", note));
+  return t;
+}
+function barList(title, note, items) {                 // [{ name, value, figure, hint }]: one row per item, bars on one scale
+  const box = el("div", "chart"); box.appendChild(el("h3", null, title)); if (note) box.appendChild(el("p", "hint", note));
+  const top = Math.max(...items.map((i) => i.value), 1);
+  for (const i of items) { const row = el("div", "bar-row"); row.title = i.hint || `${i.name}: ${i.figure}`;
+    row.appendChild(el("span", "bar-name", i.name)); const track = el("span", "bar-track"); const bar = el("span", "bar"); bar.style.width = (100 * i.value / top) + "%";
+    track.appendChild(bar); row.appendChild(track); row.appendChild(el("span", "bar-figure", i.figure)); box.appendChild(row); }
+  return box;
+}
+function showSummary(s, rows) {
+  const view = $("summary-view"); view.innerHTML = ""; const n = +s.tips, K = +s.K, num = (x) => (+x).toLocaleString();
+  const hero = el("div", "hero"); hero.appendChild(el("span", "hero-figure", num(K)));
+  hero.appendChild(el("span", "hero-text", ` representatives for ${num(n)} tips (${pct(100 * K / n)} kept)`)); view.appendChild(hero);
+  const strength = +s.rate_correction;
+  view.appendChild(el("p", "hint", (strength >= 1 ? "Clusters chosen with branch lengths corrected for rate." : strength > 0 ? `Clusters chosen with branch lengths corrected for rate part way (${strength}).` : "Clusters chosen on the tree's own branch lengths.") +
+    " Every cluster is a whole clade, represented by its central tip." + (s.exact === "TRUE" ? "" : " (The search could not certify this division as the best.)")));
+  const tiles = el("div", "tiles");
+  tiles.appendChild(tile("Branch length kept", pct(+s.pd_kept_pct), "share of the tree's branch length that the representatives span", +s.pd_kept_pct));
+  tiles.appendChild(tile("Mean distance to the representative", (+s.mean_distance_to_representative).toPrecision(3), "summed tree distance from each tip to its representative, divided by the tips"));
+  tiles.appendChild(tile("Largest cluster", num(s.largest_cluster) + " tips"));
+  tiles.appendChild(tile("Clusters of one tip", pct(+s.singletons_pct), null, +s.singletons_pct));
+  const flagged = rows.filter((r) => r.flags > 0).length;
+  tiles.appendChild(tile("Clusters to look at", num(flagged), `${pct(100 * flagged / K)} of clusters; ${num(rows.filter((r) => r.flags >= 2).length)} with two reasons or more`, 100 * flagged / K));
+  if (+s.taxa_kept > 0) tiles.appendChild(tile("Names kept", num(s.taxa_kept), "every name in the chosen column has a representative"));
+  view.appendChild(tiles);
+  const charts = el("div", "charts");
+  // cluster sizes, in ordered bins
+  const bins = [[1, 1, "1 tip"], [2, 2, "2"], [3, 5, "3–5"], [6, 10, "6–10"], [11, 20, "11–20"], [21, 50, "21–50"], [51, 100, "51–100"], [101, 500, "101–500"], [501, Infinity, "more than 500"]];
+  const sizes = bins.map(([lo, hi, name]) => { const inBin = rows.filter((r) => r.tips >= lo && r.tips <= hi); const tips = inBin.reduce((a, r) => a + r.tips, 0);
+    return { name, value: inBin.length, figure: num(inBin.length), hint: `${num(inBin.length)} clusters of ${name === "1 tip" ? "one tip" : name + " tips"}, holding ${num(tips)} tips (${pct(100 * tips / n)})` }; }).filter((b) => b.value > 0);
+  charts.appendChild(barList("Cluster sizes", "number of clusters of each size", sizes));
+  // how far the tips are from their representative in sequence
+  if (s.identical_to_representative_pct !== undefined && s.identical_to_representative_pct !== "") {
+    const I = +s.identical_to_representative_pct, w1 = +s["within_0.01_pct"], w2 = +s["within_0.022_pct"], w5 = +s["within_0.05_pct"];
+    const parts = [["identical", I], ["up to 1%", w1 - I], ["1–2.2%", w2 - w1], ["2.2–5%", w5 - w2], ["more than 5%", 100 - w5]];
+    charts.appendChild(barList("Difference from the representative in sequence", `share of tips, by the share of sites that differ (representatives count as identical)` +
+      (+s.tips_not_judged > 0 ? `; ${num(s.tips_not_judged)} tips share too few sites to compare` : ""), parts.map(([name, v]) => ({ name, value: v, figure: pct(v) }))));
+  }
+  // clusters to look at, by reason
+  const reasons = [["names", "only tip of its name"], ["sequences", "far in sequence"], ["tree", "longest branches"], ["better", "incomplete sequence"]];
+  charts.appendChild(barList("Clusters to look at, by reason", "a cluster can have several reasons", reasons.map(([k, name]) => { const c = rows.filter((r) => r[k]).length; return { name, value: c, figure: num(c) }; })));
+  view.appendChild(charts);
 }
 
 // ---- the list of clusters (only the rows in view are drawn)

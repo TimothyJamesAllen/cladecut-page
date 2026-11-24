@@ -1,10 +1,10 @@
 // The engine runs here, apart from the page, so that the page stays responsive. The page sends messages
 // ({ id, type, ... }) and gets one answer for each ({ id, ok, result } or { id, ok: false, error }), and progress
 // messages ({ progress: text }) on the way.
-import { createEngine, matchingTips, MITOGENOME_PATTERN } from "./engine.js";
+import { createEngine, matchingTips, MITOGENOME_PATTERN } from "./engine.js?v=23a4f0e";
 
 let engine = null, labels = [], files = {};
-const ready = fetch("cladecut.wasm").then((r) => { if (!r.ok) throw new Error("cannot load cladecut.wasm"); return r.arrayBuffer(); }).then(createEngine).then((e) => (engine = e));
+const ready = fetch("cladecut.wasm?v=23a4f0e").then((r) => { if (!r.ok) throw new Error("cannot load cladecut.wasm"); return r.arrayBuffer(); }).then(createEngine).then((e) => (engine = e));
 const progress = (text) => postMessage({ progress: text });
 
 // the bytes of a file or a text; a file compressed with gzip is read as it was before compression
@@ -44,7 +44,9 @@ const handlers = {
     const t0 = performance.now(); engine.setOptions(options); engine.run(0); engine.setSeconds((performance.now() - t0) / 1000);
     const rows = engine.rows().split("\n").filter(Boolean).map((line) => { const f = line.split("\t");
       return { id: f[0], rep: f[1], tips: +f[2], flags: +f[3], names: f[4] === "1", sequences: f[5] === "1", tree: f[6] === "1", better: f[7] === "1", reasons: f[8] || "" }; });
-    return { report: engine.file("report"), rows };
+    const [head, values] = engine.file("summary").trimEnd().split("\n").map((l) => l.split("\t"));
+    const summary = Object.fromEntries(head.map((h, i) => [h, values[i]]));
+    return { report: engine.file("report"), rows, summary };
   },
   async cluster({ index }) { return engine.cluster(index); },
   async where({ tip }) { return engine.clusterOf(tip); },
