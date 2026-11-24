@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- the page may load nothing from elsewhere and send nothing anywhere: the files stay on this computer -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self'; connect-src 'self'; style-src 'self'; img-src 'self' data: blob:; object-src 'none'; base-uri 'none'; form-action 'none'">
+<title>cladecut</title>
+<link rel="stylesheet" href="style.css">
+<script type="module" src="app.js"></script>
+</head>
+<body>
+<header>
+  <h1>cladecut</h1>
+  <p>Reduce a tree to representative tips, see the clusters whose representative is plainly wrong, and make choices for the next run. <strong>Your files stay on this computer.</strong></p>
+</header>
+
+<section id="load">
+  <h2>Files and settings</h2>
+  <div class="grid">
+    <label>Tree <span class="hint">Newick, rooted, with branch lengths</span><input type="file" id="tree-file"></label>
+    <label>Names table <span class="hint">optional; tab or comma separated, may be gzipped</span><input type="file" id="names-file"></label>
+    <label>Alignment <span class="hint">optional; aligned FASTA, may be gzipped</span><input type="file" id="fasta-file"></label>
+    <label>Choices <span class="hint">optional; a choices file saved earlier</span><input type="file" id="choices-file"></label>
+  </div>
+  <p><button id="read-files">Read the files</button> <button id="example" class="quiet">Try a small simulated example</button> <span id="files-status" class="status"></span></p>
+
+  <div id="settings" hidden>
+    <div class="grid">
+      <label>Representatives
+        <span class="row"><select id="size-kind"><option value="share">share of the tips (%)</option><option value="number">number</option></select>
+        <input type="number" id="size-value" value="10" min="0" step="any"></span></label>
+      <label>Age limit <span class="hint">optional; 1 is the cut at one level</span><input type="number" id="age-limit" min="1" step="any" placeholder="no limit"></label>
+      <label class="names-only">Name column <span class="hint">tips with a name are preferred</span><select id="name-column"></select></label>
+      <label class="names-only">Every name in this column keeps a representative<select id="keep-taxa"><option value="">none</option></select></label>
+      <label class="names-only">Compare names at<select id="flag-ranks" multiple size="4"></select></label>
+    </div>
+    <p>
+      <label class="check"><input type="checkbox" id="rate" checked> choose clusters on the scale of relative evolutionary divergence</label>
+      <label class="check"><input type="checkbox" id="mito"> prefer mitogenomes as representatives <span class="hint" id="mito-count"></span></label>
+    </p>
+    <p><button id="run" class="primary">Run</button> <span id="run-status" class="status"></span></p>
+  </div>
+  <p id="error" class="error" hidden></p>
+</section>
+
+<section id="result" hidden>
+  <h2>Summary</h2>
+  <pre id="report"></pre>
+  <p id="changed" class="changed" hidden></p>
+
+  <h2>Clusters</h2>
+  <div class="filters">
+    <p class="hint wide">A cluster is flagged when its representative looks plainly wrong for it. Show only flagged clusters <input type="checkbox" id="only-flagged" checked>, flagged because:</p>
+    <label class="check block"><input type="checkbox" class="kind" value="names" checked> the representative is the only tip of its family, genus or species in the cluster, while most of the cluster's named tips share another one <span id="n-names"></span></label>
+    <label class="check block"><input type="checkbox" class="kind" value="sequences" checked> the representative's sequence differs at more than 10% of sites from most of the other tips in the cluster <span id="n-sequences"></span></label>
+    <label class="check block"><input type="checkbox" class="kind" value="tree" checked> the representative sits on one of the longest branches in the tree (the longest 0.1%) <span id="n-tree"></span></label>
+    <label class="check block"><input type="checkbox" class="kind" value="better" checked> the representative's sequence covers less than half the alignment, while another tip in the cluster has a complete one <span id="n-better"></span></label>
+    <label>sort by <select id="sort"><option value="flags">plainest cases first</option><option value="tips">largest cluster</option><option value="id">cluster</option></select></label>
+    <input type="search" id="find" placeholder="find a tip or cluster">
+  </div>
+  <div class="list-head"><span>cluster</span><span>representative</span><span>tips</span><span>flags</span><span>why</span></div>
+  <div id="list" class="list"><div id="list-space"></div></div>
+  <p id="list-count" class="hint"></p>
+
+  <div id="cluster" hidden>
+    <h2 id="cluster-title"></h2>
+    <p id="cluster-reasons" class="reasons"></p>
+    <p><button id="split">Split this cluster in two</button></p>
+    <p class="hint" id="split-hint"></p>
+    <canvas id="tree-view"></canvas>
+    <div class="table-wrap"><table id="tips"></table></div>
+    <p class="hint">Marks: R representative, M mitogenome or preferred, N named, C complete sequence, K kept, X never a representative.</p>
+  </div>
+
+  <h2>Choices</h2>
+  <p class="hint">Each choice is a rule for the next run; the division returned is the best one that respects all of them.</p>
+  <ul id="choices"></ul>
+  <p><button id="rerun" class="primary">Run again with the choices</button> <button id="undo">Undo the last choice</button> <button id="save-choices">Save the choices</button></p>
+
+  <h2>Downloads</h2>
+  <p class="hint">The same files as the command writes; the command line gives the same result.</p>
+  <ul id="downloads"></ul>
+  <pre id="command"></pre>
+</section>
+<footer id="version" class="hint"></footer>
+</body>
+</html>
